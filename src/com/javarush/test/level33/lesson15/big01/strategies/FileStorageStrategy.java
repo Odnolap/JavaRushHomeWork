@@ -5,7 +5,12 @@ public class FileStorageStrategy implements StorageStrategy {
 
     private long bucketSizeLimit = 10000;
 
-    private FileBucket[] table = new FileBucket[DEFAULT_INITIAL_CAPACITY];;
+    private FileBucket[] table = new FileBucket[DEFAULT_INITIAL_CAPACITY];
+    {
+        for (int i = 0; i < table.length; i++) {
+            table[i] = new FileBucket();
+        }
+    }
     int size;
 
     int hash(Long k){
@@ -33,38 +38,46 @@ public class FileStorageStrategy implements StorageStrategy {
         return null;
     }
 
-    // TODO
     void resize(int newCapacity){
         int MAXIMUM_CAPACITY = 1 << 30;
-        Entry[] oldTable = table;
+        FileBucket[] oldTable = table;
         int oldCapacity = oldTable.length;
         if (oldCapacity == MAXIMUM_CAPACITY) {
-            threshold = Integer.MAX_VALUE;
             return;
         }
-        Entry[] newTable = new Entry[newCapacity];
+        FileBucket[] newTable = new FileBucket[newCapacity];
         transfer(newTable);
+        for (FileBucket fb : table) {
+            fb.remove();
+        }
         table = newTable;
-        threshold = (int)Math.min(newCapacity * loadFactor, MAXIMUM_CAPACITY + 1);
     }
 
     // TODO
-    void transfer(Entry[] newTable){
+    void transfer(FileBucket[] newTable){
         int newCapacity = newTable.length;
-        for (Entry e : table) {
-            while(null != e) {
+        Entry[] newEntryArray = new Entry[newCapacity];
+        FileBucket[] oltTable = table;
+        for (int i = 0; i < oltTable.length ; i++) {
+            for (Entry e = oltTable[i].getEntry() ; e != null ; ) {
                 Entry next = e.next;
-                int i = indexFor(e.hash, newCapacity);
-                e.next = newTable[i];
-                newTable[i] = e;
+                int newIndex = indexFor(e.hash, newCapacity);
+                e.next = newEntryArray[newIndex];
+                newEntryArray[newIndex] = e;
                 e = next;
             }
         }
+        for (int i = 0; i < newCapacity; i++) {
+            newTable[i] = new FileBucket();
+            if (newEntryArray[i] != null) {
+                newTable[i].putEntry(newEntryArray[i]);
+            }
+        }
+
     }
 
-    // TODO
     void addEntry(int hash, Long key, String value, int bucketIndex){
-        if ((size >= threshold) && (null != table[bucketIndex])) {
+        if ((null != table[bucketIndex]) && (table[bucketIndex].getFileSize() > bucketSizeLimit)) {
             resize(2 * table.length);
             hash = (null != key) ? hash(key) : 0;
             bucketIndex = indexFor(hash, table.length);
@@ -115,10 +128,12 @@ public class FileStorageStrategy implements StorageStrategy {
         if (key == null) return; // ???
         int hash = hash(key);
         int i = indexFor(hash, table.length);
-        for (Entry e = table[i].getEntry(); e != null; e = e.next) {
+        Entry startEntry = table[i].getEntry();
+        for (Entry e = startEntry; e != null; e = e.next) {
             Long k;
             if (e.hash == hash && ((k = e.key) == key || key.equals(k))) {
                 e.value = value;
+                table[i].putEntry(startEntry);
                 return;
             }
         }
