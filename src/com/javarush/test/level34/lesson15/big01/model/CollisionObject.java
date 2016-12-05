@@ -18,9 +18,7 @@ public abstract class CollisionObject extends GameObject{
             case RIGHT: newX +=  FIELD_SELL_SIZE;
         }
 
-        return gameObject.getX() <= newX
-                && gameObject.getX() >= this.getX()
-                && gameObject.getY() <= newY
-                && gameObject.getY() >= this.getY();
+        return gameObject.getX() == newX
+                && gameObject.getY() == newY;
     }
 }
